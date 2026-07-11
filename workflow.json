@@ -1,0 +1,455 @@
+{
+  "name": "AI Content Pipeline - LLM Failover Demo",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AI Content Pipeline — LLM Failover Demo\nImport-ready rebuild of the core pattern from a production 9-agent WordPress publisher (658+ posts, 41 days unattended). The signature is **provider failover**: a primary model call with an automatic fallback, so a single provider outage never stops publishing.\n\n**Honest framing:** the production system is custom Python. This is the same architecture in n8n, runnable end to end with zero credentials. Add your own Groq / WordPress keys to make it live.\n\n`Schedule → Keyword Queue → Groq (primary) → [fail?] → Gemini (fallback) → SEO → Publish → Run Log`",
+        "height": 250,
+        "width": 2140,
+        "color": 7
+      },
+      "id": "f879f6c7-fceb-4d05-a1e0-8b222533942f",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        304,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Keyword Queue (SQLite mirror)\nThree sample keyword rows with difficulty + KD type stand in for the production SQLite `keyword_queue`. The pick logic mirrors the KD-rotation rule (favor one hard keyword per two easy).",
+        "height": 470,
+        "width": 300,
+        "color": 4
+      },
+      "id": "d10dd39e-ba85-4824-ba8d-2bea39a6eb4b",
+      "name": "Sticky Note - Queue",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        456,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### 1–3 · LLM FAILOVER  (the signature pattern)\n**Generate Article — Primary (Groq)** calls `llama-3.3-70b-versatile`. It is set to *Continue On Fail*, so a 401/429/5xx never halts the run.\n\n**IF Primary Failed?** inspects the response. No content → route to the fallback.\n\n**Fallback (Gemini)** repeats the request against a different provider and quota pool.\n\nProduction cascades further: Groq → 4 NVIDIA NIM models → Gemini. Same idea, more rungs.",
+        "height": 470,
+        "width": 690,
+        "color": 3
+      },
+      "id": "1fa7c462-20c0-4c70-aa60-e8c5aae84330",
+      "name": "Sticky Note - Failover",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        788,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Normalize + SEO Package\n**Normalize** unwraps whichever provider answered into one contract: title, article, meta. With no API key it emits a clearly labeled sample article so the pipeline still runs.\n\n**SEO Package** builds the slug, trims the meta description to 155 chars, derives the focus keyword, counts words, and attaches Article schema.",
+        "height": 300,
+        "width": 460,
+        "color": 4
+      },
+      "id": "a39e5d21-2b7f-4c50-bc45-15fb4c9c9f43",
+      "name": "Sticky Note - Normalize+SEO",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Publish\n**Publish to WordPress (mock)** posts to `httpbin.org` so the demo runs with zero setup and you can see the exact payload echoed back.\n\n**Publish to WordPress (real)** is the official n8n WordPress node, disabled. Add your site credential and enable it to publish for real.",
+        "height": 470,
+        "width": 280,
+        "color": 5
+      },
+      "id": "557534a7-47a3-4321-86c1-eafa32bf0f49",
+      "name": "Sticky Note - Publish",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2004,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Run Log + Alerts\n**Run Log** writes an outcome summary per run (mirrors the production `post_log` + `agent_runs` tables): keyword, title, provider used, word count, publish status.\n\n**Failure Alert** is a disabled email stub. Wire it to any node's error output for notifications.",
+        "height": 470,
+        "width": 280,
+        "color": 6
+      },
+      "id": "9e3a5fd4-0f61-4c7a-b226-2b8547a8831d",
+      "name": "Sticky Note - Log",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "e948828d-3023-4b75-a92e-72ca50b75603",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keyword Queue -- mirrors the production SQLite `keyword_queue` table.\n// In production a query picks one pending keyword per run using a KD-rotation\n// rule (favor one high-difficulty keyword per two low-difficulty ones per\n// category). Here we hold three sample rows and apply the same pick.\nconst queue = [\n  { keyword: \"how large language models generate text\", difficulty: 41, kd_type: \"high_kd\", category: \"AI & Machine Learning\", status: \"pending\" },\n  { keyword: \"best free ai writing tools 2026\",          difficulty: 28, kd_type: \"low_kd\",  category: \"AI & Machine Learning\", status: \"pending\" },\n  { keyword: \"what is retrieval augmented generation\",   difficulty: 33, kd_type: \"low_kd\",  category: \"AI & Machine Learning\", status: \"pending\" },\n];\n\nconst pending = queue.filter(k => k.status === \"pending\");\nconst picked  = pending.find(k => k.kd_type === \"high_kd\") || pending[0];\n\nreturn [{\n  json: {\n    keyword:     picked.keyword,\n    difficulty:  picked.difficulty,\n    kd_type:     picked.kd_type,\n    category:    picked.category,\n    queue_depth: pending.length,\n    run_started: new Date().toISOString(),\n  },\n}];\n"
+      },
+      "id": "4c598a1f-fe51-4e47-80b3-4e4830a919f8",
+      "name": "Keyword Queue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.GROQ_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.7,\n  \"max_tokens\": 4096,\n  \"response_format\": {\n    \"type\": \"json_object\"\n  },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a senior content writer for a professional publication. Reply with ONLY a JSON object shaped exactly as {\\\"title\\\": string, \\\"article\\\": string of clean HTML using h2 sections, \\\"meta_description\\\": string of at most 155 characters that includes the focus keyword}. No text outside the JSON. Vary sentence length, avoid marketing cliches, and do not use em dashes as sentence connectors.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Focus keyword: {{ $('Keyword Queue').first().json.keyword }}. Category: {{ $('Keyword Queue').first().json.category }}. Target length 1200-1600 words.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "06aad6c4-fd34-4916-8fc9-7161974c519d",
+      "name": "Generate Article - Primary (Groq)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        460
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f0e488b2-8ea1-45ad-b8f4-7b58671dbc45",
+              "leftValue": "={{ !$json.choices || $json.choices.length === 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "05692636-3634-41df-a233-e291747fa008",
+      "name": "IF Primary Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"You are a senior content writer. Focus keyword: {{ $('Keyword Queue').first().json.keyword }}. Category: {{ $('Keyword Queue').first().json.category }}. Write a 1200-1600 word article and reply with ONLY a JSON object shaped as {\\\"title\\\": string, \\\"article\\\": string of clean HTML using h2 sections, \\\"meta_description\\\": string of at most 155 characters including the focus keyword}.\"\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\",\n    \"temperature\": 0.7\n  }\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "4ccb1680-1fc6-4239-b66e-a609c8c40559",
+      "name": "Fallback - Gemini",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        640
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize LLM Output -- unwrap whichever provider answered into one contract.\n// Groq (OpenAI-compatible) and Gemini return different shapes; downstream nodes\n// should not care which one ran. Pull the keyword from the queue node so the\n// article facts survive even when an LLM node failed and passed only an error.\nconst kw  = $('Keyword Queue').first().json;\nconst inp = $input.item.json;\n\nlet title = null, article = null, meta = null, provider = null;\n\n// Groq / OpenAI-compatible success shape\nif (inp.choices && inp.choices[0] && inp.choices[0].message) {\n  provider = \"groq:llama-3.3-70b-versatile\";\n  try {\n    const p = JSON.parse(inp.choices[0].message.content);\n    title = p.title; article = p.article; meta = p.meta_description;\n  } catch (e) { /* fall through */ }\n}\n\n// Gemini success shape\nif (!article && inp.candidates && inp.candidates[0]) {\n  provider = \"gemini:gemini-2.5-flash\";\n  try {\n    const t = inp.candidates[0].content.parts[0].text;\n    const p = JSON.parse(t);\n    title = p.title; article = p.article; meta = p.meta_description;\n  } catch (e) { /* fall through */ }\n}\n\n// Demo safety net: no live key, both providers returned no usable content.\n// Emit a labeled deterministic article so the pipeline runs end to end.\nlet demoMode = false;\nif (!article) {\n  demoMode = true;\n  provider = provider || \"demo-fallback (no API key set)\";\n  const k = kw.keyword;\n  const T = k.charAt(0).toUpperCase() + k.slice(1);\n  title = T + \": A Practical 2026 Guide\";\n  article =\n    \"<p><strong>\" + T + \"</strong> is a topic every \" + kw.category + \" reader runs into. \" +\n    \"This sample article stands in for live model output so the pipeline runs without an API key.</p>\" +\n    \"<h2>Why \" + T + \" Matters</h2><p>Placeholder body generated deterministically from the keyword row. \" +\n    \"With a Groq or Gemini key wired in, this section carries real model output using the same JSON contract.</p>\" +\n    \"<h2>How It Works</h2><p>The queue picked \\\"\" + k + \"\\\" (difficulty \" + kw.difficulty + \", \" + kw.kd_type + \"). \" +\n    \"The failover chain tried Groq first, then Gemini. Both returned nothing in demo mode, so this stand-in was used.</p>\" +\n    \"<h2>Conclusion</h2><p>Swap in a real key to see genuine articles flow through the same SEO, publish, and logging stages.</p>\";\n  meta = T + \": a practical 2026 guide covering \" + k + \" for \" + kw.category + \" readers.\";\n}\n\nreturn { json: {\n  keyword:          kw.keyword,\n  category:         kw.category,\n  difficulty:       kw.difficulty,\n  kd_type:          kw.kd_type,\n  provider_used:    provider,\n  demo_mode:        demoMode,\n  title:            title,\n  article:          article,\n  meta_description: meta,\n} };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "53b106c2-0911-4477-9a9e-85c94f0ece37",
+      "name": "Normalize LLM Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SEO Package -- slug, meta trim to 155, focus keyword, word count, Article schema.\nconst d = $input.item.json;\n\nconst slug = (d.title || d.keyword).toLowerCase()\n  .replace(/[^a-z0-9\\s-]/g, \"\")\n  .trim().replace(/\\s+/g, \"-\").slice(0, 60).replace(/-+$/, \"\");\n\nlet meta = (d.meta_description || \"\").trim();\nif (meta.length > 155) meta = meta.slice(0, 152).replace(/\\s+\\S*$/, \"\") + \"...\";\n\n// focus keyword: drop stopwords, keep at most 4 words (mirrors _derive_focus_keyword)\nconst STOP = new Set([\"how\",\"what\",\"why\",\"when\",\"where\",\"who\",\"which\",\"is\",\"are\",\"the\",\"a\",\"an\",\"to\",\"in\",\"on\",\"of\",\"for\",\"and\",\"best\"]);\nconst focus = d.keyword.split(/\\s+/).filter(w => !STOP.has(w.toLowerCase())).slice(0, 4).join(\" \") || d.keyword;\n\nconst words = (d.article || \"\").replace(/<[^>]+>/g, \" \").split(/\\s+/).filter(Boolean).length;\n\nreturn { json: Object.assign({}, d, {\n  slug: slug,\n  meta_description: meta,\n  focus_keyword: focus,\n  word_count: words,\n  schema: {\n    \"@context\": \"https://schema.org\",\n    \"@type\": \"Article\",\n    \"headline\": d.title,\n    \"description\": meta,\n    \"keywords\": focus,\n  },\n}) };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "ac12e4b6-1c22-4d04-a99f-adead12f004e",
+      "name": "SEO Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"slug\": {{ JSON.stringify($json.slug) }},\n  \"status\": \"publish\",\n  \"content\": {{ JSON.stringify($json.article) }},\n  \"meta\": {\n    \"focus_keyword\": {{ JSON.stringify($json.focus_keyword) }},\n    \"meta_description\": {{ JSON.stringify($json.meta_description) }},\n    \"word_count\": {{ $json.word_count }},\n    \"provider_used\": {{ JSON.stringify($json.provider_used) }},\n    \"demo_mode\": {{ $json.demo_mode }}\n  }\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "37334f51-9ecc-436d-ba76-aca9fe91e915",
+      "name": "Publish to WordPress (mock)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2060,
+        460
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "title": "={{ $json.title }}",
+        "additionalFields": {
+          "content": "={{ $json.article }}",
+          "status": "publish"
+        }
+      },
+      "id": "0faf9d4f-458d-4173-8ce3-baebab404ca4",
+      "name": "Publish to WordPress (real)",
+      "type": "n8n-nodes-base.wordpress",
+      "typeVersion": 1,
+      "position": [
+        2060,
+        640
+      ],
+      "disabled": true,
+      "credentials": {
+        "wordpressApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Add your WordPress credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run Log -- one outcome summary per run (mirrors production post_log + agent_runs).\n// Pull article facts from the SEO node; the publish response replaced $json.\nconst seo = $('SEO Package').first().json;\nconst pub = $input.item.json;                 // httpbin echo, or error if unreachable\nconst published = !!(pub && pub.json);        // httpbin returns { json: <our payload> }\n\nconst summary = {\n  status:                published ? \"published\" : \"publish_failed\",\n  timestamp:             new Date().toISOString(),\n  keyword:               seo.keyword,\n  title:                 seo.title,\n  slug:                  seo.slug,\n  focus_keyword:         seo.focus_keyword,\n  word_count:            seo.word_count,\n  meta_description:      seo.meta_description,\n  provider_used:         seo.provider_used,\n  demo_mode:             seo.demo_mode,\n  mock_publish_endpoint: \"https://httpbin.org/post\",\n  mock_echo_url:         (pub && pub.url) ? pub.url : null,\n};\nconsole.log(\"[RUN LOG] \" + JSON.stringify(summary, null, 2));\nreturn { json: summary };\n",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "cdccb225-ffb5-41b9-8058-c7b1d994aa99",
+      "name": "Run Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2360,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "bot@example.com",
+        "toEmail": "you@example.com",
+        "subject": "=Content pipeline failure: {{ $json.keyword }}",
+        "emailFormat": "text",
+        "text": "=A pipeline run failed. Keyword: {{ $json.keyword }}. Open the n8n execution log for detail."
+      },
+      "id": "15c2672a-e5a0-4f1b-9e0b-dbbc0028d947",
+      "name": "Failure Alert (disabled)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2360,
+        640
+      ],
+      "disabled": true,
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Add your SMTP credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Keyword Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keyword Queue": {
+      "main": [
+        [
+          {
+            "node": "Generate Article - Primary (Groq)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Article - Primary (Groq)": {
+      "main": [
+        [
+          {
+            "node": "IF Primary Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Primary Failed?": {
+      "main": [
+        [
+          {
+            "node": "Fallback - Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize LLM Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback - Gemini": {
+      "main": [
+        [
+          {
+            "node": "Normalize LLM Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize LLM Output": {
+      "main": [
+        [
+          {
+            "node": "SEO Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEO Package": {
+      "main": [
+        [
+          {
+            "node": "Publish to WordPress (mock)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Publish to WordPress (real)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to WordPress (mock)": {
+      "main": [
+        [
+          {
+            "node": "Run Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
