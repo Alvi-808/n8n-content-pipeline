@@ -20,7 +20,7 @@ n8n now serves the editor at http://localhost:5678 and holds this terminal open.
 start http://localhost:5678
 
 # 3. Import the workflow
-$env:Path = "C:\Program Files\nodejs;$env:Path"; npx n8n import:workflow --input="C:\Users\Alvi\career\portfolio\n8n-content-pipeline\workflow.json"
+$env:Path = "C:\Program Files\nodejs;$env:Path"; npx n8n import:workflow --input="workflow.json"
 ```
 
 Refresh the browser. The workflow **AI Content Pipeline - LLM Failover Demo** is now in your list. Open it and click **Execute Workflow** (bottom center). Every node on the mock path lights up green.
