@@ -38,7 +38,7 @@ Set the browser zoom so sticky-note text is readable. Use the canvas zoom-to-fit
 - This proves no secrets are hardcoded and that the workflow is safe to share.
 - Filename suggestion: `05-env-auth.png`.
 
-## 6. Publish detail (mock plus real target) — optional
+## 6. Publish detail (mock plus real target), optional
 
 - Frame the **Publish to WordPress (mock)** node next to the disabled **Publish to WordPress (real)** node and the Publish sticky note.
 - Shows that the demo is runnable now and production-ready with one credential.
@@ -47,7 +47,7 @@ Set the browser zoom so sticky-note text is readable. Use the canvas zoom-to-fit
 ## Caption ideas for the listing
 
 - "One workflow, two model providers, zero downtime when one fails."
-- "Rebuilt the failover pattern from my production publisher (658+ posts, 41 days unattended) in n8n."
+- "Rebuilt the failover pattern from my production publisher (856 posts, zero failed publishes) in n8n."
 - "Runs end to end with no API keys. Add your own to go live."
 
 ## Where to use them

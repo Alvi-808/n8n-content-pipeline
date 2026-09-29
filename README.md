@@ -2,7 +2,7 @@
 
 An import-ready n8n workflow that generates an SEO article from a keyword queue, survives a primary LLM outage by failing over to a second provider, packages the result for SEO, and publishes it. It runs end to end with zero credentials so you can import it and press Execute in about five minutes.
 
-This is a portable rebuild of the core pattern from a production content system I run: a 9-agent Python publisher that has shipped 658+ WordPress posts and held a 41-day unattended run with zero failed publishes. The production system is custom Python. This demo shows the same architecture expressed in n8n.
+This is a portable rebuild of the core pattern from a production content system I run: a 9-agent Python publisher that has shipped 856 posts to WordPress with zero failed publishes, 241 of them during a 41-day stretch when I was away and a teammate kept confirming keywords. The production system is custom Python. This demo shows the same architecture expressed in n8n.
 
 ## What it does
 
@@ -51,7 +51,7 @@ flowchart LR
 
 Free and low-cost LLM tiers rate-limit hard. A single provider will return 429 during a burst, go down for maintenance, or deprecate a model out from under you. If your pipeline calls one model and that call fails, publishing stops until a human notices.
 
-The production system this demo is based on runs a six-rung cascade: Groq first, then four NVIDIA NIM models, then Gemini as a last resort on a separate billing pool. When one rung returns a quota or server error, the pipeline drops to the next rung and keeps going. That is the mechanism behind the 41-day unattended run and the 658+ posts with zero failed publishes. The failover is not a nice-to-have. It is the reason the system stays up without a babysitter.
+The production system this demo is based on runs a six-rung cascade: Groq first, then four NVIDIA NIM models, then Gemini as a last resort on a separate billing pool. When one rung returns a quota or server error, the pipeline drops to the next rung and keeps going. That is the mechanism behind the 856 posts with zero failed publishes, including the 41 days I was away. The failover is not a nice-to-have. It is the reason a provider outage does not stop publishing.
 
 This n8n demo compresses that cascade to two rungs (Groq then Gemini) to keep the canvas readable. The pattern is identical: try a provider, detect failure, route to the next provider, converge on one output contract.
 
@@ -61,9 +61,9 @@ The production publisher is custom Python with its own SQLite state, WordPress R
 
 ## Files
 
-- `workflow.json` — the export, import-ready, zero secrets.
-- `SETUP.md` — 5-minute import instructions, plus how to add your own Groq and WordPress credentials.
-- `SCREENSHOTS.md` — the exact shots to capture for a portfolio listing.
+- `workflow.json`: the export, import-ready, zero secrets.
+- `SETUP.md`: 5-minute import instructions, plus how to add your own Groq and WordPress credentials.
+- `SCREENSHOTS.md`: the exact shots to capture for a portfolio listing.
 
 ## Credentials and safety
 
